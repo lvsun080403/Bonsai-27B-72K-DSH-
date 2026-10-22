@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bonsai 27B · 72K 本地服务与 DSH 接入（v1.3）</title><style>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bonsai 27B · 72K 本地服务（可复现部署包 v1.4）</title><style>
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
 body {
@@ -50,7 +50,7 @@ blockquote {
   pre { white-space: pre-wrap; }
 }
 </style></head><body>
-<h1>Bonsai 27B · 72K 本地服务（可复现部署包 v1.3）</h1>
+<h1>Bonsai 27B · 72K 本地服务（可复现部署包 v1.4）</h1>
 <p>一台 12 GB 显存的笔记本（RTX 5070 Ti Laptop / 16 GB 内存）上，跑一个 <strong>27B 参数、72,768 token 上下文</strong>的本地大模型，并接进 DeepSeek Harness 当日常模型用。</p>
 <ul><li><strong>首次部署</strong>：双击 <code>install.bat</code>，自动下载 10.4 GB、校验、解压、启动。</li><li><strong>以后使用</strong>：双击 <code>start.bat</code> / <code>stop.bat</code> / <code>status.bat</code>。</li><li><strong>接进 DSH</strong>：装一次插件（<code>dsh-local-model-toggle-plugin-0.6.0.zip</code>），之后左下角一个开关就能启停。</li><li><strong>不需要</strong> Python、CUDA Toolkit、CMake、Visual Studio，也不需要编译。</li></ul>
 <table><thead><tr><th>项目</th><th>值</th></tr></thead><tbody><tr><td>模型</td><td>Ternary Bonsai 2 27B（三进制权重，PTQ1_0）</td></tr><tr><td>权重文件</td><td><code>Ternary-Bonsai-2-27B-ninfer-v3.ninfer</code>，9,520,051,456 字节（8.87 GiB）</td></tr><tr><td>推理引擎</td><td>KVMem v0.18.0 · NInfer 后端 · Windows RTX 50 系（sm_120a）</td></tr><tr><td>上下文</td><td>73,728 tokens（rk4v4 量化 KV）</td></tr><tr><td>显存占用</td><td>约 10.4–10.6 GB</td></tr><tr><td>速度</td><td>预填充 564–679 tok/s，解码 57–66 tok/s</td></tr><tr><td>端口 / 模型名</td><td><code>http://127.0.0.1:18200/v1</code> · <code>bonsai2-27b</code></td></tr><tr><td><strong>API Key</strong></td><td>默认 <code>sk-171212e1b4a08d12xh2131234356647yu</code>，首次 install 时写进 <code>api-key.txt</code></td></tr></tbody></table>
@@ -97,10 +97,15 @@ print(client.chat.completions.create(model=&quot;bonsai2-27b&quot;,
 <table><thead><tr><th>缺的东西</th><th>从哪补的</th><th>校验</th></tr></thead><tbody><tr><td>Windows 引擎</td><td>KVMem <code>v0.18.0</code> 的 <code>kvmem-v0.18.0-ninfer-windows-rtx50-sm120a.zip</code></td><td>SHA256 <code>F893DC90…DBDF7D</code></td></tr><tr><td>三元权重</td><td><code>WaveCut/Ternary-Bonsai-2-27B-NInfer-v3</code> 的 <code>.ninfer</code></td><td>SHA256 <code>CDC4810B…C14A</code></td></tr></tbody></table>
 <p><strong>&quot;50 系通用编码&quot;</strong>：官方按架构分三包——<code>rtx30-sm86</code>、<code>rtx40-sm89</code>、<code>rtx50-sm120a</code>。 <code>sm_120a</code> 是 Blackwell 全系通用指令集，包内预编译 192 个 cubin（<code>VALIDATION.json</code> 记录 SM75/86/89/120a 各 192 个）。 它不是 5070 Ti Laptop 专用，而是<strong>整个 50 系都能跑</strong>；本机 <code>compute_cap=12.0</code> 正好落在其中。</p>
 <p><strong>兼容性验证</strong>：三元权重是 PrismML 私有张量类型，官方 llama.cpp 加载会直接报 <code>tensor &#x27;output.weight&#x27; has invalid ggml type 143</code>。这个引擎的二进制里 <code>t2_g128</code> 出现 2 次、<code>hadamard</code> 55 次、 <code>QP2_0</code>/<code>PTQ1</code>/<code>tq1_0</code> 全为 0 —— 只认 v3 这套格式，正好对上 WaveCut 的构件。</p>
+<p><strong>文件全在网盘和仓库里散着</strong>：引擎在一个 GitHub release、权重在一个 HuggingFace 仓库、原指南在魔搭、 三元内核在另一个 fork，谁都不带一键脚本。这份包把它们拼到一起，做成了&quot;双击一个 bat 就能跑&quot;的一键下载部署。</p>
 <hr>
 <h2>四、原理：27B 怎么塞进 12 GB</h2>
 <h3>4.1 三进制权重：1.76 bit/参数</h3>
 <p>每个权重压成 <code>{-1, 0, +1}</code> 三档，再配分组缩放（FP16），有效位宽 <strong>1.76 bit</strong>。 27B × 1.76 bit ≈ <strong>5.9 GB</strong>，和 9B 的 Q4（5.56 GB）几乎一样大；代价是精度保留 <strong>98.2%</strong>（83.9 vs 85.4）。 GGUF 头里 851 个张量中有 **323 个是 <code>t2_g128_fp16</code><strong>，</strong>517 处 hadamard** 标记。</p>
+<p>官方给的口径是：<strong>8 GB 显存即可运行</strong>；在 16 GB 显卡上可以开满 <strong>262,144 上下文</strong>，实测只占 <strong>7 GB 出头</strong>显存。 换句话说，它用比 Q2_K 更小的体积，拿到了接近满精度的分数。<strong>如果没有三进制这条路，「27B 进 12 GB」在物理上就不成立</strong>——这不是调参能解决的，是格式的胜利。</p>
+<p>官方公布的各项保留率（相对满精度 FP16 版本）：</p>
+<table><thead><tr><th>能力</th><th>保留率</th><th>原始分对比</th></tr></thead><tbody><tr><td>综合</td><td><strong>98.2%</strong></td><td>83.9 对 85.4</td></tr><tr><td>数学</td><td>99.5%</td><td>—</td></tr><tr><td>编程</td><td>99.3%</td><td>—</td></tr><tr><td>指令遵循</td><td><strong>102%</strong>（略超）</td><td>—</td></tr><tr><td>知识推理</td><td>96.9%</td><td>—</td></tr><tr><td>视觉</td><td>96.3%</td><td>—</td></tr><tr><td>智能体与工具调用</td><td>97.3%</td><td>—</td></tr></tbody></table>
+<p>注意这些是<strong>官方口径</strong>（原生权重基准）；本包用的是社区按 NInfer v3 格式重新打包的构件，实际表现以第七节实测为准。</p>
 <h3>4.2 Hadamard 旋转：摊平离群值</h3>
 <p>少数&quot;特别大&quot;的权重被压成 ±1 后损失惨重。量化前做一次 Hadamard 正交旋转把能量摊到所有通道，推理时反向旋转 （<code>prism.hadamard.weight_names</code> 记录转哪些）。这是保住 98% 精度的核心。</p>
 <h3>4.3 KVMem：分页 KV</h3>
@@ -111,6 +116,11 @@ print(client.chat.completions.create(model=&quot;bonsai2-27b&quot;,
 <p><code>--spec mtp --draft-tokens 2</code>：模型自带预测头先猜 2 个 token，主模型一次验证。 实测接受率约 41–51%，是解码能到 57–66 tok/s 的主要原因。</p>
 <h3>4.5 rk4v4：KV 也量化</h3>
 <p>KV 压到 4 bit 分组量化。同样 12 GB，f16 KV 只能开 32K，rk4v4 能开 72K——<strong>这是 72K 成立的前提</strong>。</p>
+<h3>4.6 上下文怎么定：推荐 100K，默认 73K</h3>
+<p>模型原生窗口 262,144，但<strong>能开多少取决于显存</strong>，而这台机器的显存已经被权重吃掉大半：</p>
+<table><thead><tr><th>上下文</th><th>适用</th><th>说明</th></tr></thead><tbody><tr><td>100K</td><td><strong>12 GB 卡推荐上限</strong></td><td>需要把 <code>--kvmem-budget</code> 再压低、并把桌面程序关掉一些</td></tr><tr><td><strong>73,728（默认）</strong></td><td>日常主力</td><td>约 <strong>11.9 万字</strong>，相当于一整本《活着》；满载后还留 1.2 GB 给桌面</td></tr><tr><td>32K</td><td>保守</td><td>只做问答和短文档</td></tr><tr><td>262K</td><td>16 GB 以上显卡</td><td>官方口径：16 GB 卡开满 262K 只占 7 GB 出头</td></tr></tbody></table>
+<p><strong>为什么 73K 是默认</strong>：实测 48K 满载还剩 2.3 GB，75K 满载只剩 1.5 GB，再往上开视频就会掉帧。</p>
+<p>另外，这套引擎对<strong>已经消耗掉的内容</strong>做了摘要压缩与还原——很长的多轮对话里，早先的上下文会被压成摘要留在池子里， 需要时再还原回去，所以<strong>长任务不会因为窗口满了就突然失忆</strong>。这也是它感上比&quot;硬窗口&quot;更耐用的地方。</p>
 <hr>
 <h2>五、门槛</h2>
 <table><thead><tr><th>项</th><th>要求</th><th>说明</th></tr></thead><tbody><tr><td>显卡</td><td>RTX 50 系（sm_120a）</td><td>40 系要 rtx40-sm89 包，30 系 rtx30-sm86</td></tr><tr><td>显存</td><td>≥ 12 GB</td><td>72K + 权重实测 10.4–10.6 GB，留 1.5 GB 给桌面</td></tr><tr><td>内存</td><td>≥ 16 GB</td><td>host KV 2 GiB + 引擎约 2.2 GB；默认 12 GiB 配置在 16 GB 机器上会启动失败</td></tr><tr><td>磁盘</td><td>≥ 22 GB</td><td>引擎 0.9 + 解压 1.7 + 权重 9.5 + 余量</td></tr><tr><td>驱动</td><td>支持 CUDA 13.x</td><td>本机 591.91</td></tr><tr><td>工具链 / Python</td><td><strong>不需要</strong></td><td>全预编译二进制</td></tr></tbody></table>
@@ -135,12 +145,10 @@ print(client.chat.completions.create(model=&quot;bonsai2-27b&quot;,
 <table><thead><tr><th>项</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>参数量</td><td>27B（三进制）</td><td>8.95B（Q4_K_M）</td></tr><tr><td>权重体积</td><td>9.52 GB（.ninfer）</td><td>5.56 GB（.gguf）</td></tr><tr><td>显存</td><td>10.4–10.6 GB @72K</td><td>10.27 GB @131072</td></tr><tr><td>上下文</td><td>73,728（页池限制）</td><td>131,072（显存限制）</td></tr><tr><td>多模态</td><td>有视觉塔（本包关闭）</td><td>原生多模态（无 mmproj，当前纯文本）</td></tr><tr><td>引擎</td><td>KVMem / NInfer</td><td>llama.cpp b11669</td></tr><tr><td>换硬件</td><td>必须 sm_120a 同代</td><td>任意 CUDA</td></tr></tbody></table>
 <h3>7.2 速度（同机、62–71K 提示）</h3>
 <table><thead><tr><th>指标</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>预填充（20K）</td><td>679 tok/s</td><td>2,813 tok/s（8K 时）</td></tr><tr><td>预填充（48K）</td><td>604 tok/s</td><td>—</td></tr><tr><td>预填充（71K）</td><td>564 tok/s</td><td>—</td></tr><tr><td>首字延迟（20K）</td><td>29.5 s</td><td>约 7 s</td></tr><tr><td>首字延迟（71K）</td><td>124.7 s</td><td>约 25 s</td></tr><tr><td>解码</td><td>57–66 tok/s</td><td>55.5 tok/s</td></tr><tr><td>解码（长文）</td><td>58.9 tok/s</td><td>40.4 tok/s</td></tr></tbody></table>
+<p>官方标称的横向速度（同一份三进制权重，换硬件）：</p>
+<table><thead><tr><th>硬件</th><th>解码速度</th><th>备注</th></tr></thead><tbody><tr><td>RTX 5090</td><td>143 tok/s</td><td>官方标称峰值</td></tr><tr><td><strong>RTX 5070 Ti Laptop 12 GB</strong></td><td><strong>57–66 tok/s</strong></td><td>本机实测，见上表</td></tr><tr><td>Apple M5 Max</td><td>46.8 tok/s</td><td>官方标称，统一内存低带宽</td></tr><tr><td>iPhone 18 Pro</td><td>约为前代 2×</td><td>官方标称，端侧</td></tr></tbody></table>
 <p><strong>读法</strong>：9B 预填充快 4–5 倍（稠密小模型 + 常规注意力），但解码持平，长上下文 Bonsai 反而更快。</p>
-<h3>7.3 智慧（同一套 8 题）</h3>
-<table><thead><tr><th>题目</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>三管注水（36/7≈5.14h）</td><td>✅ 正确</td><td>❌ 算成 9 小时</td></tr><tr><td>写 <code>longest_inc</code> 代码</td><td>✅</td><td>✅</td></tr><tr><td>严格格式三行输出</td><td>✅</td><td>✅</td></tr><tr><td>虚构条约辨认</td><td>❌ 编造「1589 年」</td><td>❌ 编造「1815 年」</td></tr><tr><td>长材料抽细节</td><td>✅</td><td>✅</td></tr><tr><td>严格 JSON</td><td>✅</td><td>✅</td></tr><tr><td>三人真假话推理</td><td>✅</td><td>✅</td></tr><tr><td>找二分查找 bug</td><td>✅</td><td>✅</td></tr></tbody></table>
-<p><strong>结论</strong>：Bonsai 在<strong>算术/多步计算</strong>上明显更强；事实性幻觉两者一样，不会因为 27B 就消失。</p>
-<h3>7.4 什么时候用哪个</h3>
-<table><thead><tr><th>场景</th><th>推荐</th></tr></thead><tbody><tr><td>长文档一次读完</td><td><strong>Bonsai 72K</strong></td></tr><tr><td>日常问答、写代码</td><td><strong>9B</strong>（首字快 4 倍）</td></tr><tr><td>多步计算、数字推理</td><td><strong>Bonsai</strong></td></tr><tr><td>接 DSH 当 agent</td><td><strong>9B</strong>（预填充快、工具调用稳）</td></tr></tbody></table>
+<p><strong>读法</strong>：9B 预填充快 4–5 倍（稠密小模型 + 常规注意力），但解码持平，长上下文 Bonsai 反而更快。</p>
 <hr>
 <h2>八、接进 DeepSeek Harness</h2>
 <p>分两件事：<strong>① 让模型出现在 DSH 的模型列表里</strong>（改配置，手动做一次）；<strong>② 装左下角开关插件</strong>（双击 install.bat，以后用开关启停）。</p>
@@ -212,8 +220,8 @@ print(client.chat.completions.create(model=&quot;bonsai2-27b&quot;,
 <p>权重默认从 <code>hf-mirror.com</code> 下，失败会自动退到 <code>huggingface.co</code>。</p>
 <hr>
 <h2>十三、版本变更</h2>
-<table><thead><tr><th>版本</th><th>变化</th></tr></thead><tbody><tr><td>v1.3</td><td>新增完整 DSH 接入章节（模型提供商 + 开关插件 + 验证清单）；补「安装后目录」；包内附带插件 zip</td></tr><tr><td>v1.2</td><td>下载加进度条、8 源自动测速与失败换源、45 秒卡死检测、<code>--ssl-no-revoke</code> 修复 TLS 报错、权重双源兜底</td></tr><tr><td>v1.1</td><td>新增 <code>install.bat</code> 一键部署（含环境自检、SHA256 校验、VC++ 自动安装）、<code>api-key.txt</code> 默认密钥</td></tr><tr><td>v1.0</td><td>首个可复现包：<code>start/stop/status</code> 三个 bat + <code>serve.ps1</code></td></tr></tbody></table>
+<table><thead><tr><th>版本</th><th>变化</th></tr></thead><tbody><tr><td>v1.4</td><td>删掉「7.3 智慧」「7.4 什么时候用哪个」两节；补官方口径（8 GB 可跑 / 16 GB 开满 262K）、各项精度保留率、官方横向速度（5090 143、M5 Max 46.8、iPhone 18 Pro 2×）、上下文定档建议（100K 推荐 / 73K 默认）、摘要压缩与还原说明、新开源仓库链接</td></tr><tr><td>v1.3</td><td>新增完整 DSH 接入章节（模型提供商 + 开关插件 + 验证清单）；补「安装后目录」；包内附带插件 zip</td></tr><tr><td>v1.2</td><td>下载加进度条、8 源自动测速与失败换源、45 秒卡死检测、<code>--ssl-no-revoke</code> 修复 TLS 报错、权重双源兜底</td></tr><tr><td>v1.1</td><td>新增 <code>install.bat</code> 一键部署（含环境自检、SHA256 校验、VC++ 自动安装）、<code>api-key.txt</code> 默认密钥</td></tr><tr><td>v1.0</td><td>首个可复现包：<code>start/stop/status</code> 三个 bat + <code>serve.ps1</code></td></tr></tbody></table>
 <hr>
 <h2>十四、来源链接</h2>
-<ul><li>权重（本包用的 v3 构件）：<a href="https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3">https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3</a></li><li>权重（GGUF 原始仓）：<a href="https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf">https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf</a></li><li>引擎：<a href="https://github.com/kvmem/kvmem/releases/tag/v0.18.0">https://github.com/kvmem/kvmem/releases/tag/v0.18.0</a></li><li>原作者指南（缺件的那份）：<a href="https://modelscope.cn/models/shensanshu/ninfer-ada-ternary">https://modelscope.cn/models/shensanshu/ninfer-ada-ternary</a></li><li>同型号硬件参考工程：<a href="https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent">https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent</a></li></ul>
+<ul><li><strong>本项目的开源仓库（新）</strong>：<a href="https://github.com/lvsun080403/Bonsai-27B-72K-DSH-">https://github.com/lvsun080403/Bonsai-27B-72K-DSH-</a></li><li>权重（本包用的 v3 构件）：<a href="https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3">https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3</a></li><li>权重（GGUF 原始仓）：<a href="https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf">https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf</a></li><li>引擎：<a href="https://github.com/kvmem/kvmem/releases/tag/v0.18.0">https://github.com/kvmem/kvmem/releases/tag/v0.18.0</a></li><li>原作者指南（缺件的那份）：<a href="https://modelscope.cn/models/shensanshu/ninfer-ada-ternary">https://modelscope.cn/models/shensanshu/ninfer-ada-ternary</a></li><li>同型号硬件参考工程：<a href="https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent">https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent</a></li></ul>
 </body></html>
