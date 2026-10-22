@@ -1,0 +1,219 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bonsai 27B · 72K 本地服务与 DSH 接入（v1.3）</title><style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body {
+  margin: 0 auto; padding: 48px 28px 96px; max-width: 900px;
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 16px; line-height: 1.8; color: #1c1c20; background: #fdfdfd;
+}
+h1 { font-size: 1.9em; margin: 0 0 .2em; letter-spacing: -.01em; }
+h2 { font-size: 1.35em; margin: 2.2em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid #e6e6ea; }
+h3 { font-size: 1.1em; margin: 1.6em 0 .5em; }
+p { margin: .8em 0; }
+strong { font-weight: 650; }
+hr { border: none; border-top: 1px solid #e6e6ea; margin: 2.4em 0; }
+a { color: #1a66d0; text-decoration: none; }
+a:hover { text-decoration: underline; }
+code {
+  font-family: "Cascadia Code", Consolas, "Courier New", monospace;
+  font-size: .9em; background: #f1f2f5; padding: .15em .4em; border-radius: 5px;
+}
+pre {
+  background: #17181c; color: #e6e7ea; padding: 14px 16px; border-radius: 10px;
+  overflow-x: auto; line-height: 1.55;
+}
+pre code { background: none; padding: 0; color: inherit; font-size: .88em; }
+table { border-collapse: collapse; width: 100%; margin: 1.2em 0; font-size: .94em; }
+th, td { border: 1px solid #e2e2e8; padding: 9px 12px; text-align: left; vertical-align: top; }
+th { background: #f5f6f9; font-weight: 600; }
+tbody tr:nth-child(even) { background: #fafafc; }
+ul, ol { padding-left: 1.5em; }
+li { margin: .35em 0; }
+blockquote {
+  margin: 1.2em 0; padding: .2em 1em; border-left: 3px solid #c9ccd6;
+  background: #f7f8fa; border-radius: 0 8px 8px 0; color: #444a55;
+}
+@media (prefers-color-scheme: dark) {
+  body { background: #14151a; color: #e6e7ea; }
+  h2 { border-color: #2a2c33; }
+  hr { border-color: #2a2c33; }
+  code { background: #23252c; }
+  pre { background: #0f1013; border: 1px solid #26282f; }
+  th, td { border-color: #2a2c33; }
+  th { background: #1c1e24; }
+  tbody tr:nth-child(even) { background: #191b20; }
+  blockquote { background: #1b1d23; border-color: #3a3f4b; color: #b9bdc7; }
+  a { color: #6cb0ff; }
+}
+@media print {
+  body { padding: 0; max-width: none; }
+  pre { white-space: pre-wrap; }
+}
+</style></head><body>
+<h1>Bonsai 27B · 72K 本地服务（可复现部署包 v1.3）</h1>
+<p>一台 12 GB 显存的笔记本（RTX 5070 Ti Laptop / 16 GB 内存）上，跑一个 <strong>27B 参数、72,768 token 上下文</strong>的本地大模型，并接进 DeepSeek Harness 当日常模型用。</p>
+<ul><li><strong>首次部署</strong>：双击 <code>install.bat</code>，自动下载 10.4 GB、校验、解压、启动。</li><li><strong>以后使用</strong>：双击 <code>start.bat</code> / <code>stop.bat</code> / <code>status.bat</code>。</li><li><strong>接进 DSH</strong>：装一次插件（<code>dsh-local-model-toggle-plugin-0.6.0.zip</code>），之后左下角一个开关就能启停。</li><li><strong>不需要</strong> Python、CUDA Toolkit、CMake、Visual Studio，也不需要编译。</li></ul>
+<table><thead><tr><th>项目</th><th>值</th></tr></thead><tbody><tr><td>模型</td><td>Ternary Bonsai 2 27B（三进制权重，PTQ1_0）</td></tr><tr><td>权重文件</td><td><code>Ternary-Bonsai-2-27B-ninfer-v3.ninfer</code>，9,520,051,456 字节（8.87 GiB）</td></tr><tr><td>推理引擎</td><td>KVMem v0.18.0 · NInfer 后端 · Windows RTX 50 系（sm_120a）</td></tr><tr><td>上下文</td><td>73,728 tokens（rk4v4 量化 KV）</td></tr><tr><td>显存占用</td><td>约 10.4–10.6 GB</td></tr><tr><td>速度</td><td>预填充 564–679 tok/s，解码 57–66 tok/s</td></tr><tr><td>端口 / 模型名</td><td><code>http://127.0.0.1:18200/v1</code> · <code>bonsai2-27b</code></td></tr><tr><td><strong>API Key</strong></td><td>默认 <code>sk-171212e1b4a08d12xh2131234356647yu</code>，首次 install 时写进 <code>api-key.txt</code></td></tr></tbody></table>
+<hr>
+<h2>一、怎么装（从零开始）</h2>
+<pre><code>Bonsai-27B-72K\
+   install.bat      ← 首次运行这个
+   start.bat        ← 以后启动
+   stop.bat         ← 停止
+   status.bat       ← 看状态</code></pre>
+<p><strong>步骤</strong>：</p>
+<ol><li>把整个文件夹放到一个<strong>剩余空间 ≥ 22 GB</strong> 的盘上（路径可以有中文和空格）。</li><li>双击 <code>install.bat</code>。</li><li>等它跑完（首次约 10–30 分钟，取决于网速；断了重跑会<strong>续传</strong>）。</li><li>看到 <code>[+] 完成</code> 就好了，浏览器会自动打开 Web UI。</li></ol>
+<p><code>install.bat</code> 做了什么：</p>
+<table><thead><tr><th>步骤</th><th>内容</th><th>失败时会怎样</th></tr></thead><tbody><tr><td>0</td><td>查 Windows 版本、curl、显卡（<code>compute_cap=12.0</code>）、磁盘、VC++ 运行库</td><td>缺 VC++ 会自动下载安装（弹一次 UAC）；显卡不是 50 系会直接停下并说明</td></tr><tr><td>1</td><td>测速挑源 → 下载引擎包 900 MB → 校验 SHA256 → 解压到 <code>engine\</code></td><td>校验不过会删掉重下；某个源卡住会自动换源</td></tr><tr><td>2</td><td>下载权重 9.5 GB → 校验 SHA256 → 放 <code>model\</code></td><td>同上</td></tr><tr><td>3</td><td>没有 <code>api-key.txt</code> 就写入默认密钥</td><td>—</td></tr><tr><td>4</td><td>调 <code>serve.ps1</code> 启动服务，等 <code>/health</code> 200</td><td>打印引擎日志最后 12 行</td></tr></tbody></table>
+<p><strong>可复现性说明</strong>：引擎和权重是从公开地址下载的，脚本里写死了 SHA256， 任何一个字节不对就拒绝启动。所以&quot;我这能跑、你那不能跑&quot;的差异只可能来自驱动或显卡代际。</p>
+<hr>
+<h2>二、API Key</h2>
+<p>默认密钥：<code>sk-171212e1b4a08d12xh2131234356647yu</code>，首次运行 <code>install.bat</code> 时会自动写入包根目录的 <code>api-key.txt</code>（纯文本、无 BOM）。本包<strong>刻意不带</strong> <code>api-key.txt</code> —— 这样谁拿到都不会继承别人的密钥。</p>
+<ul><li><strong>改密钥</strong>：直接编辑 <code>api-key.txt</code>，改完 <code>stop.bat</code> 再 <code>start.bat</code>。</li><li><strong>关闭校验</strong>：删掉 <code>api-key.txt</code>，重启后不带 key 也能访问（仅本机回环，风险不大）。</li><li><strong>不要</strong>把带密钥的包发给别人；发给别人前删掉 <code>api-key.txt</code> 即可回落成无密钥模式。</li><li><strong>接了 DSH 的话</strong>：DSH 那边另有一份密钥副本（<code>.credentials.yaml</code>），改钥匙要两边一起改，否则 401。</li></ul>
+<p>调用示例（PowerShell）：</p>
+<pre><code class="lang-powershell">$key = Get-Content .\api-key.txt -Raw
+$body = @{
+  model    = &#x27;bonsai2-27b&#x27;
+  messages = @(@{ role = &#x27;user&#x27;; content = &#x27;用一句话解释什么是三进制量化&#x27; })
+  max_tokens = 1024
+} | ConvertTo-Json -Depth 6
+
+curl.exe -s http://127.0.0.1:18200/v1/chat/completions `
+  -H &quot;Content-Type: application/json&quot; `
+  -H &quot;Authorization: Bearer $key&quot; `
+  -d $body</code></pre>
+<p>Python（openai SDK）：</p>
+<pre><code class="lang-python">from openai import OpenAI
+client = OpenAI(base_url=&quot;http://127.0.0.1:18200/v1&quot;, api_key=open(&quot;api-key.txt&quot;).read().strip())
+print(client.chat.completions.create(model=&quot;bonsai2-27b&quot;,
+      messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;你好&quot;}], max_tokens=1024).choices[0].message.content)</code></pre>
+<p><strong>注意</strong>：这个模型默认&quot;先思考再回答&quot;。<code>max_tokens</code> 给小了（比如 128）会出现 &quot;200 正常返回、但 content 是空的、completion_tokens 正好等于上限&quot;——思考把额度吃完了。 给 ≥1024，或者在 prompt 里写&quot;直接回答，不要思考过程&quot;。</p>
+<hr>
+<h2>三、这份包解决的问题</h2>
+<p>原作者的开源仓库 <code>shensanshu/ninfer-ada-ternary</code>（魔搭）<strong>是半成品</strong>：</p>
+<ul><li>全库 89 个文件，最大 0.6 MB，总大小 1.3 MB；</li><li>README 承诺的 <code>①极速档（PQ2三元）.zip</code>（18.4 GiB）、<code>00-从这里开始.md</code>、<code>自检-搬家.ps1</code>、<code>src-tree\</code> <strong>全部不存在</strong>；</li><li><code>NOTICE.md</code> 明写「本仓不分发模型权重」。</li></ul>
+<p>按指南原路复现要 CUDA 13.3 + MSVC 14.51 + CMake 4.4.3 从源码编译，还要 ≥64 GB 内存跑一次全精度转换—— 16 GB 内存、没有 C++ 工具链的机器做不到。</p>
+<p>这份包把缺的两块补齐并验证它们能对上：</p>
+<table><thead><tr><th>缺的东西</th><th>从哪补的</th><th>校验</th></tr></thead><tbody><tr><td>Windows 引擎</td><td>KVMem <code>v0.18.0</code> 的 <code>kvmem-v0.18.0-ninfer-windows-rtx50-sm120a.zip</code></td><td>SHA256 <code>F893DC90…DBDF7D</code></td></tr><tr><td>三元权重</td><td><code>WaveCut/Ternary-Bonsai-2-27B-NInfer-v3</code> 的 <code>.ninfer</code></td><td>SHA256 <code>CDC4810B…C14A</code></td></tr></tbody></table>
+<p><strong>&quot;50 系通用编码&quot;</strong>：官方按架构分三包——<code>rtx30-sm86</code>、<code>rtx40-sm89</code>、<code>rtx50-sm120a</code>。 <code>sm_120a</code> 是 Blackwell 全系通用指令集，包内预编译 192 个 cubin（<code>VALIDATION.json</code> 记录 SM75/86/89/120a 各 192 个）。 它不是 5070 Ti Laptop 专用，而是<strong>整个 50 系都能跑</strong>；本机 <code>compute_cap=12.0</code> 正好落在其中。</p>
+<p><strong>兼容性验证</strong>：三元权重是 PrismML 私有张量类型，官方 llama.cpp 加载会直接报 <code>tensor &#x27;output.weight&#x27; has invalid ggml type 143</code>。这个引擎的二进制里 <code>t2_g128</code> 出现 2 次、<code>hadamard</code> 55 次、 <code>QP2_0</code>/<code>PTQ1</code>/<code>tq1_0</code> 全为 0 —— 只认 v3 这套格式，正好对上 WaveCut 的构件。</p>
+<hr>
+<h2>四、原理：27B 怎么塞进 12 GB</h2>
+<h3>4.1 三进制权重：1.76 bit/参数</h3>
+<p>每个权重压成 <code>{-1, 0, +1}</code> 三档，再配分组缩放（FP16），有效位宽 <strong>1.76 bit</strong>。 27B × 1.76 bit ≈ <strong>5.9 GB</strong>，和 9B 的 Q4（5.56 GB）几乎一样大；代价是精度保留 <strong>98.2%</strong>（83.9 vs 85.4）。 GGUF 头里 851 个张量中有 **323 个是 <code>t2_g128_fp16</code><strong>，</strong>517 处 hadamard** 标记。</p>
+<h3>4.2 Hadamard 旋转：摊平离群值</h3>
+<p>少数&quot;特别大&quot;的权重被压成 ±1 后损失惨重。量化前做一次 Hadamard 正交旋转把能量摊到所有通道，推理时反向旋转 （<code>prism.hadamard.weight_names</code> 记录转哪些）。这是保住 98% 精度的核心。</p>
+<h3>4.3 KVMem：分页 KV</h3>
+<p>KV 缓存切成 <strong>64 token 一页</strong>，只给真正用到的页分显存，超预算的换到 host 内存。</p>
+<ul><li><code>--kvmem-budget 69632</code>：显存里最多放 69,632 token 的 KV</li><li><code>--kvmem-gen-reserve 4096</code>：生成阶段余量</li><li><code>--kvmem-sink-tokens 8192</code>：开头 8K 常驻显存，永不换出</li><li><code>--kvmem-sessions 2</code>：host 里保留 2 份对话快照</li></ul>
+<p><strong>硬约束</strong>：容量 = <code>budget + reserve</code>，与请求里的 context 无关。 实测传 <code>-Context 262144</code>，引擎照样报 <code>capacity | KV 49,152 tokens</code>。</p>
+<h3>4.4 MTP：投机解码</h3>
+<p><code>--spec mtp --draft-tokens 2</code>：模型自带预测头先猜 2 个 token，主模型一次验证。 实测接受率约 41–51%，是解码能到 57–66 tok/s 的主要原因。</p>
+<h3>4.5 rk4v4：KV 也量化</h3>
+<p>KV 压到 4 bit 分组量化。同样 12 GB，f16 KV 只能开 32K，rk4v4 能开 72K——<strong>这是 72K 成立的前提</strong>。</p>
+<hr>
+<h2>五、门槛</h2>
+<table><thead><tr><th>项</th><th>要求</th><th>说明</th></tr></thead><tbody><tr><td>显卡</td><td>RTX 50 系（sm_120a）</td><td>40 系要 rtx40-sm89 包，30 系 rtx30-sm86</td></tr><tr><td>显存</td><td>≥ 12 GB</td><td>72K + 权重实测 10.4–10.6 GB，留 1.5 GB 给桌面</td></tr><tr><td>内存</td><td>≥ 16 GB</td><td>host KV 2 GiB + 引擎约 2.2 GB；默认 12 GiB 配置在 16 GB 机器上会启动失败</td></tr><tr><td>磁盘</td><td>≥ 22 GB</td><td>引擎 0.9 + 解压 1.7 + 权重 9.5 + 余量</td></tr><tr><td>驱动</td><td>支持 CUDA 13.x</td><td>本机 591.91</td></tr><tr><td>工具链 / Python</td><td><strong>不需要</strong></td><td>全预编译二进制</td></tr></tbody></table>
+<hr>
+<h2>六、我做的优化与取舍</h2>
+<h3>6.1 最终参数（写在 <code>scripts\serve.ps1</code>）</h3>
+<pre><code class="lang-powershell">-Context 73728 -HostMiB 2048 -Budget 69632 -Reserve 4096 -SinkTokens 8192 `
+-KvType rk4v4 -NoVision -MtpDrafts 2 -RetainedSessions 2 -Port 18200 `
+-WorkerArgs @(&#x27;--no-cuda-graph&#x27;,&#x27;--fast-prefill-kernel&#x27;,&#x27;--draft-tokens&#x27;,&#x27;2&#x27;,&#x27;--prefill-chunk&#x27;,&#x27;512&#x27;)</code></pre>
+<table><thead><tr><th>参数</th><th>为什么</th></tr></thead><tbody><tr><td><code>-HostMiB 2048</code> + <code>-RetainedSessions 2</code></td><td>默认 12 GiB host KV 在 16 GB 机器上启动即失败；2 GiB 能跑，省约 10 GB 内存</td></tr><tr><td><code>-KvType rk4v4</code></td><td>f16 KV 只能 32K；rk4v4 到 72K，解码不降速</td></tr><tr><td><code>-Context 73728 -Budget 69632 -Reserve 4096</code></td><td>满足 <code>budget+reserve ≤ context</code>，再大装不下</td></tr><tr><td><code>-SinkTokens 8192</code></td><td>长文档问答时标题/摘要常驻显存</td></tr><tr><td><code>-MtpDrafts 2</code></td><td>实测 2 最好；4/6 从 55–60 掉到 42–45</td></tr><tr><td><code>-NoVision</code></td><td>视觉塔常驻 0.73 GB，先关掉腾显存</td></tr><tr><td><code>--no-cuda-graph</code></td><td>这套构建开 CUDA Graph 启动即崩（<code>cudaErrorGraphExecUpdateFailure</code>）</td></tr><tr><td><code>--prefill-chunk 512</code></td><td><strong>防断电</strong>，见 6.2</td></tr></tbody></table>
+<h3>6.2 会瞬间断电的配置（重点）</h3>
+<p>这台机器在特定配置下<strong>整机瞬间断电</strong>：Kernel-Power 41、<code>BugcheckCode=0</code>、无蓝屏、无 WHEA、无过热事件。</p>
+<p>四组对照（每次只改一个变量）：</p>
+<table><thead><tr><th>实验</th><th>配置</th><th>负载</th><th>峰值功耗</th><th>结果</th></tr></thead><tbody><tr><td>1</td><td>9B / llama.cpp / 131072</td><td>3×8.9 万 token 冷预填（165 s）</td><td>140.8 W / 88 °C</td><td>存活</td></tr><tr><td>2a</td><td>ninfer + <code>--prefill-cublas</code> / chunk 512</td><td>62K 冷预填（101 s）</td><td>139.8 W / 88 °C</td><td>存活</td></tr><tr><td>2b</td><td>ninfer / chunk 4096 / 无 cublas</td><td>62K 冷预填（90 s）</td><td>140.5 W / 89 °C</td><td>存活</td></tr><tr><td>2c</td><td>ninfer / chunk 4096 + cublas</td><td>62K 冷预填</td><td>—</td><td><strong>断电</strong></td></tr></tbody></table>
+<p><strong>结论</strong>：不是电源不够（9B 在 140.8 W 连拉 165 秒没事），而是 <strong>宽 prefill 分块 × cuBLAS 路径</strong>叠加时 那一次极宽的 GEMM 产生毫秒级电流尖峰——500 ms 采样看不见，但足以触发保护。 所以 <code>--prefill-chunk 512</code> 且<strong>不开 cuBLAS</strong>。<code>--device-profile calibrate</code> 是第二个独立断电点，同样禁用。</p>
+<h3>6.3 cublas 在 512 分块下没用</h3>
+<p>同样 8K 提示：chunk 512 无 cublas = 724 tok/s，chunk 512 + cublas = 709 tok/s。 cuBLAS 只在分块 ≥2048 才有收益。所以最终不开——速度一样，少一个会断电的开关。</p>
+<hr>
+<h2>七、与 Qwen3.5-9B 的全面对比</h2>
+<p>两者都是本机部署、都在 12 GB 显存下。9B 用 llama.cpp + Q4_K_M（131072 上下文）。</p>
+<h3>7.1 规格</h3>
+<table><thead><tr><th>项</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>参数量</td><td>27B（三进制）</td><td>8.95B（Q4_K_M）</td></tr><tr><td>权重体积</td><td>9.52 GB（.ninfer）</td><td>5.56 GB（.gguf）</td></tr><tr><td>显存</td><td>10.4–10.6 GB @72K</td><td>10.27 GB @131072</td></tr><tr><td>上下文</td><td>73,728（页池限制）</td><td>131,072（显存限制）</td></tr><tr><td>多模态</td><td>有视觉塔（本包关闭）</td><td>原生多模态（无 mmproj，当前纯文本）</td></tr><tr><td>引擎</td><td>KVMem / NInfer</td><td>llama.cpp b11669</td></tr><tr><td>换硬件</td><td>必须 sm_120a 同代</td><td>任意 CUDA</td></tr></tbody></table>
+<h3>7.2 速度（同机、62–71K 提示）</h3>
+<table><thead><tr><th>指标</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>预填充（20K）</td><td>679 tok/s</td><td>2,813 tok/s（8K 时）</td></tr><tr><td>预填充（48K）</td><td>604 tok/s</td><td>—</td></tr><tr><td>预填充（71K）</td><td>564 tok/s</td><td>—</td></tr><tr><td>首字延迟（20K）</td><td>29.5 s</td><td>约 7 s</td></tr><tr><td>首字延迟（71K）</td><td>124.7 s</td><td>约 25 s</td></tr><tr><td>解码</td><td>57–66 tok/s</td><td>55.5 tok/s</td></tr><tr><td>解码（长文）</td><td>58.9 tok/s</td><td>40.4 tok/s</td></tr></tbody></table>
+<p><strong>读法</strong>：9B 预填充快 4–5 倍（稠密小模型 + 常规注意力），但解码持平，长上下文 Bonsai 反而更快。</p>
+<h3>7.3 智慧（同一套 8 题）</h3>
+<table><thead><tr><th>题目</th><th>Bonsai 27B</th><th>Qwen3.5-9B</th></tr></thead><tbody><tr><td>三管注水（36/7≈5.14h）</td><td>✅ 正确</td><td>❌ 算成 9 小时</td></tr><tr><td>写 <code>longest_inc</code> 代码</td><td>✅</td><td>✅</td></tr><tr><td>严格格式三行输出</td><td>✅</td><td>✅</td></tr><tr><td>虚构条约辨认</td><td>❌ 编造「1589 年」</td><td>❌ 编造「1815 年」</td></tr><tr><td>长材料抽细节</td><td>✅</td><td>✅</td></tr><tr><td>严格 JSON</td><td>✅</td><td>✅</td></tr><tr><td>三人真假话推理</td><td>✅</td><td>✅</td></tr><tr><td>找二分查找 bug</td><td>✅</td><td>✅</td></tr></tbody></table>
+<p><strong>结论</strong>：Bonsai 在<strong>算术/多步计算</strong>上明显更强；事实性幻觉两者一样，不会因为 27B 就消失。</p>
+<h3>7.4 什么时候用哪个</h3>
+<table><thead><tr><th>场景</th><th>推荐</th></tr></thead><tbody><tr><td>长文档一次读完</td><td><strong>Bonsai 72K</strong></td></tr><tr><td>日常问答、写代码</td><td><strong>9B</strong>（首字快 4 倍）</td></tr><tr><td>多步计算、数字推理</td><td><strong>Bonsai</strong></td></tr><tr><td>接 DSH 当 agent</td><td><strong>9B</strong>（预填充快、工具调用稳）</td></tr></tbody></table>
+<hr>
+<h2>八、接进 DeepSeek Harness</h2>
+<p>分两件事：<strong>① 让模型出现在 DSH 的模型列表里</strong>（改配置，手动做一次）；<strong>② 装左下角开关插件</strong>（双击 install.bat，以后用开关启停）。</p>
+<h3>8.1 先确认服务在跑</h3>
+<p>双击 <code>status.bat</code>，看到「状态 : 运行中」和 <code>http://127.0.0.1:18200/v1</code> 才行。没跑就先 <code>start.bat</code>。</p>
+<h3>8.2 在 DSH 里添加这个模型</h3>
+<p>DSH → 左下齿轮 <strong>设置</strong> → <strong>模型</strong> → <strong>添加模型提供商</strong> → 选 <strong>自定义模型 API</strong>，按下表填：</p>
+<table><thead><tr><th>字段</th><th>填什么</th></tr></thead><tbody><tr><td>Provider ID</td><td><code>local-bonsai</code></td></tr><tr><td>显示名</td><td><code>Bonsai-27B-72K</code></td></tr><tr><td>端点</td><td><code>http://127.0.0.1:18200/v1</code></td></tr><tr><td>协议</td><td><code>OpenAI Chat Completions</code></td></tr><tr><td>API 密钥</td><td><code>api-key.txt</code> 里那一串（默认 <code>sk-1712…</code>）</td></tr><tr><td>模型</td><td>点「获取可用模型」→ 勾 <code>bonsai2-27b</code>（也可手填 id）</td></tr><tr><td>上下文窗口</td><td><code>73728</code></td></tr><tr><td>最大输出 token</td><td><code>8192</code></td></tr></tbody></table>
+<p>保存后<strong>完全退出 DSH 再打开</strong>（托盘也要退）。只关窗口不算——提供商和凭据只在启动时读一次。</p>
+<blockquote><p>**如果保存时报 <code>profile reload requires the root Include entry</code>**：这是当前进程的热重载缺陷，不是你填错了。改成手写配置文件，见 8.3。</p></blockquote>
+<h3>8.3 手动改配置（UI 报错时的替代方案）</h3>
+<p>先退出 DSH，然后编辑这两个文件（都在 <code>C:\Users\&lt;你&gt;\.dsh\</code> 下）：</p>
+<p><code>profiles\desktop\cordis.patch.yml</code> —— 在 <code>llm-pi-ai</code> 的 <code>providers:</code> 下面加一段（注意缩进是空格，不能用 Tab）：</p>
+<pre><code class="lang-yaml">        local-bonsai:
+          displayName: Bonsai-27B-72K
+          api: openai-completions
+          baseURL: http://127.0.0.1:18200/v1
+          apiKeyEnv: LOCAL_BONSAI_API_KEY
+          models:
+            - id: bonsai2-27b
+              name: Bonsai 27B (KVMem 72K)
+              contextWindow: 73728
+              maxTokens: 8192</code></pre>
+<p><code>.credentials.yaml</code> —— 在文件末尾的 <code>refs:</code> 下面加一行（缩进 2 空格，值与 <code>api-key.txt</code> 完全一致，不要加引号）：</p>
+<pre><code class="lang-yaml">  LOCAL_BONSAI_API_KEY: sk-171212e1b4a08d12xh2131234356647yu</code></pre>
+<p>保存后重新打开 DSH。两点必须对齐：<code>apiKeyEnv</code> 写的名字 = <code>refs</code> 里的键名。</p>
+<h3>8.4 装左下角开关插件</h3>
+<p>插件包：<code>dsh-local-model-toggle-plugin-0.6.0.zip</code>（就在这个文件夹里）。</p>
+<ol><li><strong>解压</strong>到一个固定位置（别放临时目录），比如 <code>D:\dsh-local-model-toggle</code>。</li><li>**双击里面的 <code>install.bat</code><strong>；如果你想让它直接认这个部署夹，把</strong>文件夹拖到 install.bat 上**，或命令行 <code>install.bat &quot;D:\...\Bonsai-27B-72K&quot;</code>。</li><li>脚本会：复制插件到 <code>%USERPROFILE%\.dsh\plugins\</code>、在 profile 的 <code>node_modules</code> 建 Junction、往 <code>package.json</code> 的 dependencies 与 bundles 里登记、写一份 <code>config.json</code>（记住部署夹）。</li><li><strong>完全退出 DSH 再打开</strong>。左下角（设置齿轮上方）会出现一个蓝色胶囊开关，写着当前模型名。</li></ol>
+<p>装完后的用法：</p>
+<table><thead><tr><th>操作</th><th>效果</th></tr></thead><tbody><tr><td>左键点开关</td><td>启动 / 停止当前选中的模型（停止只杀这个端口，不会误伤另一个）</td></tr><tr><td>右键点开关</td><td>弹出面板：切换模型、看/改部署夹、设「闲置自动关闭」分钟数、看最近日志</td></tr><tr><td>红点 + 「选择部署夹」</td><td>它找不到 <code>scripts\serve.ps1</code>，右键选一次正确目录即可</td></tr></tbody></table>
+<h3>8.5 验证清单</h3>
+<table><thead><tr><th>检查</th><th>期望</th></tr></thead><tbody><tr><td><code>status.bat</code></td><td>运行中，18200，模型 <code>bonsai2-27b</code>，上下文 73728</td></tr><tr><td>DSH 设置 → 模型</td><td>列表里有 <code>Bonsai-27B-72K</code></td></tr><tr><td>DSH 左下角开关</td><td>蓝色胶囊，绿点，写着 <code>Bonsai-27B-72K</code></td></tr><tr><td>开关右键菜单</td><td>能看到 <code>bonsai2-27b</code>（端口 18200）并处于选中态</td></tr><tr><td>发一句话</td><td>正常回；<code>max_tokens</code> 给 ≥1024</td></tr></tbody></table>
+<hr>
+<h2>九、已知问题</h2>
+<ol><li><strong>思考模式吃 token</strong>：<code>max_tokens</code> 小于 1024 常常只有思考没有正文。</li><li>**<code>reasoning_effort: &quot;high&quot;</code> 会 HTTP 500**，用 <code>xhigh</code>/<code>medium</code> 或不传。</li><li><strong>解码到 62K 后短样本测速会失真</strong>：9 token 样本测出 15 tok/s 是伪影；400 token 样本是 58–66 tok/s。</li><li><strong>视觉不可用</strong>：本包 <code>-NoVision</code>。要用去掉它，并把 <code>--kvmem-budget</code> 降到 65536 左右腾 0.73 GB。</li><li><strong>重启电脑后要重开</strong>：没做开机自启（避免常驻占显存）。</li><li><strong>换显卡必须换引擎包</strong>：sm_120a 的 cubin 在 40 系上跑不了。</li><li>**<code>start.bat</code> 在管道里调用会挂住**：它用 <code>Start-Process</code> 拉后台进程，子进程继承了控制台句柄。双击运行没这个问题。</li><li><strong>DSH 里改设置可能报 root Include 错</strong>：见 8.3，手写 YAML 绕过。</li></ol>
+<hr>
+<h2>十、目录与校验</h2>
+<pre><code>Bonsai-27B-72K\
+├─ install.bat            首次：一键部署（下载 + 校验 + 解压 + 启动）
+├─ start.bat              启动
+├─ stop.bat               停止（只杀自己这个端口的进程）
+├─ status.bat             状态
+├─ 重置下载.bat           下载卡死时清 download\ 重来
+├─ api-key.txt            API 密钥（install 首次运行时自动生成）
+├─ README.md              本文
+├─ 使用说明.html          同一份内容的网页版
+├─ dsh-local-model-toggle-plugin-0.6.0.zip   DSH 左下角开关插件
+├─ scripts\
+│   ├─ install.ps1        部署逻辑
+│   └─ serve.ps1          启动/停止/状态逻辑
+├─ engine\                install 后出现：引擎（约 1.0 GB）
+├─ model\                 install 后出现：权重（9.5 GB）
+├─ download\              install 后出现：下载缓存（可删）
+└─ run\                   运行时：host.pid / config.json / 日志</code></pre>
+<p><code>engine\</code> <code>model\</code> <code>download\</code> <code>run\</code> 都由脚本按需创建，<strong>不需要事先手工建</strong>。</p>
+<table><thead><tr><th>文件</th><th>SHA256</th></tr></thead><tbody><tr><td>引擎 zip</td><td><code>F893DC9053CB27EF8CDBC32687C6BB29346D5829D5EB2272A58DDEF7B6DBDF7D</code></td></tr><tr><td>权重 .ninfer</td><td><code>CDC4810B0FF17C40D0F62CF214B6E0BCD08346E9EB05CA53371507037793C14A</code></td></tr></tbody></table>
+<hr>
+<h2>十一、这个包验证到什么程度</h2>
+<p>我在这台机器上做了这些验证（都是实测，不是推断）：</p>
+<table><thead><tr><th>验证项</th><th>结果</th></tr></thead><tbody><tr><td>干净目录 <code>install.bat -DryRun</code></td><td>✅ 正确列出环境检查与下载计划，不落盘</td></tr><tr><td>干净目录真实部署（本地文件注入）</td><td>✅ 引擎解压、权重 SHA 校验、api-key 写入，8 秒完成</td></tr><tr><td>从干净目录 <code>start.bat</code> 启动</td><td>✅ 约 10 秒 <code>/health</code> 200，显存 10.4 GB</td></tr><tr><td>无 key 访问 <code>/v1/models</code></td><td>✅ 401</td></tr><tr><td>正确 key 访问</td><td>✅ 200</td></tr><tr><td>错误 key 访问</td><td>✅ 401</td></tr><tr><td>真实对话请求</td><td>✅ 200，decode 51.7 tok/s</td></tr><tr><td><code>stop.bat</code></td><td>✅ 杀掉本端口进程，显存回落 1.3 GB</td></tr><tr><td>下载地址可达性</td><td>✅ 两个 URL 都 200，<code>content-length</code> 与期望字节数一致</td></tr><tr><td>接入 DSH 后对话</td><td>✅ 回「接入成功」</td></tr></tbody></table>
+<p><strong>没验证到的</strong>：真机重装系统后从公网完整下载 10.4 GB 的端到端过程（下载太慢）。 不过下载走的是 <code>curl -C -</code> 断点续传 + SHA256 硬校验，任何中断重跑都能续上。</p>
+<hr>
+<h2>十二、下载这条链路是怎么处理的</h2>
+<p>首次部署要下 10.4 GB，这段以前最容易出问题，现在做了几件事：</p>
+<table><thead><tr><th>机制</th><th>行为</th></tr></thead><tbody><tr><td><strong>多源兜底</strong></td><td>先测 8 个 GitHub 镜像的速度，按快慢排序依次尝试；一个源失败或卡住就自动换下一个</td></tr><tr><td><strong>直连放最后</strong></td><td>直连常常「开头很快、几 MB 后就断流」，所以即使测速第一也不当首选</td></tr><tr><td><strong>卡死检测</strong></td><td>45 秒文件没有任何增长，就杀掉 curl、保留已下载部分、换源续传</td></tr><tr><td><strong>进度条</strong></td><td>每 0.8 秒刷新：百分比、已下/总量、实时速度、剩余时间；输出被重定向时退化成每 10% 一行</td></tr><tr><td><strong>TLS 兼容</strong></td><td>自动带 <code>--ssl-no-revoke</code>，避免某些网络下 <code>curl: (35) CRYPT_E_NO_REVOCATION_CHECK</code> 直接失败</td></tr></tbody></table>
+<p>知道某个镜像特别快，也可以手动指定：</p>
+<pre><code>install.bat -Proxy https://gh-proxy.com/</code></pre>
+<p>权重默认从 <code>hf-mirror.com</code> 下，失败会自动退到 <code>huggingface.co</code>。</p>
+<hr>
+<h2>十三、版本变更</h2>
+<table><thead><tr><th>版本</th><th>变化</th></tr></thead><tbody><tr><td>v1.3</td><td>新增完整 DSH 接入章节（模型提供商 + 开关插件 + 验证清单）；补「安装后目录」；包内附带插件 zip</td></tr><tr><td>v1.2</td><td>下载加进度条、8 源自动测速与失败换源、45 秒卡死检测、<code>--ssl-no-revoke</code> 修复 TLS 报错、权重双源兜底</td></tr><tr><td>v1.1</td><td>新增 <code>install.bat</code> 一键部署（含环境自检、SHA256 校验、VC++ 自动安装）、<code>api-key.txt</code> 默认密钥</td></tr><tr><td>v1.0</td><td>首个可复现包：<code>start/stop/status</code> 三个 bat + <code>serve.ps1</code></td></tr></tbody></table>
+<hr>
+<h2>十四、来源链接</h2>
+<ul><li>权重（本包用的 v3 构件）：<a href="https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3">https://hf-mirror.com/WaveCut/Ternary-Bonsai-2-27B-NInfer-v3</a></li><li>权重（GGUF 原始仓）：<a href="https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf">https://hf-mirror.com/prism-ml/Ternary-Bonsai-2-27B-gguf</a></li><li>引擎：<a href="https://github.com/kvmem/kvmem/releases/tag/v0.18.0">https://github.com/kvmem/kvmem/releases/tag/v0.18.0</a></li><li>原作者指南（缺件的那份）：<a href="https://modelscope.cn/models/shensanshu/ninfer-ada-ternary">https://modelscope.cn/models/shensanshu/ninfer-ada-ternary</a></li><li>同型号硬件参考工程：<a href="https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent">https://github.com/CSUNX233/qwen3.8-27b-ninfer-5070tilaptop-kvmem-local-agent</a></li></ul>
+</body></html>
